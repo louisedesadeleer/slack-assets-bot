@@ -260,7 +260,15 @@ def classify_image(path: Path) -> str | None:
     )
     try:
         result = subprocess.run(
-            ["claude", "-p", prompt],
+            [
+                "claude",
+                "-p",
+                "--tools",
+                "Read",
+                "--permission-mode",
+                "bypassPermissions",
+                prompt,
+            ],
             capture_output=True,
             text=True,
             timeout=90,
@@ -294,7 +302,15 @@ def auto_name_image(path: Path) -> str | None:
     )
     try:
         result = subprocess.run(
-            ["claude", "-p", prompt],
+            [
+                "claude",
+                "-p",
+                "--tools",
+                "Read",
+                "--permission-mode",
+                "bypassPermissions",
+                prompt,
+            ],
             capture_output=True,
             text=True,
             timeout=90,
