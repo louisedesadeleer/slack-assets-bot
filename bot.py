@@ -24,18 +24,53 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 load_dotenv()
 
-ASSETS_DIR = Path.home() / "assets"
-PHOTOS_DIR = ASSETS_DIR / "photos"
-SCREENSHOTS_DIR = ASSETS_DIR / "screenshots"
-VIDEOS_DIR = ASSETS_DIR / "videos"
-SOUNDS_DIR = ASSETS_DIR / "sounds"
-for d in (PHOTOS_DIR, SCREENSHOTS_DIR, VIDEOS_DIR, SOUNDS_DIR):
+ASSETS_DIR = Path(
+    os.path.expanduser(os.environ.get("ASSETS_DIR", "~/assets"))
+).resolve()
+
+ENABLED_CATEGORIES = {
+    c.strip().lower()
+    for c in os.environ.get(
+        "CATEGORIES", "screenshots,photos,videos,sounds"
+    ).split(",")
+    if c.strip()
+}
+
+# Each category maps to a base file type. Image subcategories share the
+# image bucket — the classifier picks between whichever are enabled.
+CATEGORY_TYPES = {
+    "screenshots": "image",
+    "photos": "image",
+    "memes": "image",
+    "thumbnails": "image",
+    "videos": "video",
+    "sounds": "audio",
+}
+
+CATEGORY_DIRS = {c: ASSETS_DIR / c for c in ENABLED_CATEGORIES}
+for d in CATEGORY_DIRS.values():
     d.mkdir(parents=True, exist_ok=True)
 
-IMAGE_CATEGORIES = {
-    "screenshot": SCREENSHOTS_DIR,
-    "photo": PHOTOS_DIR,
-}
+
+def image_categories() -> list[str]:
+    """Enabled image subcategories, in classifier preference order."""
+    order = ["screenshot", "photo", "meme", "thumbnail"]
+    return [c for c in order if f"{c}s" in ENABLED_CATEGORIES]
+
+
+def default_image_dir() -> Path | None:
+    """Default folder for images that don't match a specific subcategory."""
+    for c in ("photos", "screenshots", "memes", "thumbnails"):
+        if c in ENABLED_CATEGORIES:
+            return CATEGORY_DIRS[c]
+    return None
+
+
+def category_dir(label: str) -> Path | None:
+    """Map a singular label ('screenshot') to its enabled folder."""
+    plural = f"{label}s"
+    return CATEGORY_DIRS.get(plural)
+
 
 ALLOWED_SLACK_USERS = {
     u.strip()
@@ -100,11 +135,11 @@ def route_by_mime(mimetype: str | None) -> Path | None:
     if not mimetype:
         return None
     if mimetype.startswith("image/"):
-        return PHOTOS_DIR
+        return default_image_dir()
     if mimetype.startswith("video/"):
-        return VIDEOS_DIR
+        return CATEGORY_DIRS.get("videos")
     if mimetype.startswith("audio/"):
-        return SOUNDS_DIR
+        return CATEGORY_DIRS.get("sounds")
     return None
 
 
@@ -114,32 +149,51 @@ SCREENSHOT_NAME_RE = re.compile(
 )
 
 
+CATEGORY_DESCRIPTIONS = {
+    "screenshot": "a capture of a computer or phone interface",
+    "photo": "a real-world picture or a designed image",
+    "meme": "a reaction image, GIF macro, or joke image with text overlay",
+    "thumbnail": "a designed cover image for video content (16:9 with overlaid text, faces, bold styling)",
+}
+
+
 def classify_by_filename(path: Path) -> str | None:
-    if SCREENSHOT_NAME_RE.match(path.name):
+    if "screenshots" in ENABLED_CATEGORIES and SCREENSHOT_NAME_RE.match(path.name):
         return "screenshot"
     return None
 
 
-def classify_image(path: Path) -> str:
-    """Label image as screenshot/photo/thumbnail.
+def classify_image(path: Path) -> str | None:
+    """Pick the best enabled image subcategory for `path`.
 
     1. Filename heuristic (fast, free) catches CleanShot/Screenshot prefixes.
     2. Otherwise shell out to the `claude` CLI for vision classification.
-    3. Falls back to 'photo' if claude isn't installed or the call fails.
+    3. Falls back to the first enabled image category if claude isn't
+       installed or the call fails. Returns None if no image category enabled.
     """
+    enabled = image_categories()
+    if not enabled:
+        return None
+
     if label := classify_by_filename(path):
         log.info("classified %s -> %s (filename)", path.name, label)
         return label
 
-    if not shutil.which("claude"):
-        log.info("claude CLI not on PATH, defaulting %s -> photo", path.name)
-        return "photo"
+    if len(enabled) == 1:
+        return enabled[0]
 
+    if not shutil.which("claude"):
+        fallback = "photo" if "photo" in enabled else enabled[0]
+        log.info("claude CLI not on PATH, defaulting %s -> %s", path.name, fallback)
+        return fallback
+
+    options = ", ".join(enabled)
+    definitions = ". ".join(
+        f"A {c} is {CATEGORY_DESCRIPTIONS[c]}" for c in enabled
+    )
     prompt = (
-        f"Classify the image at {path} as exactly one of these two labels: "
-        "screenshot, photo. A screenshot is a capture of a computer or phone "
-        "interface. A photo is anything else (a real-world picture, a meme, "
-        "a designed image, artwork, a cover image). "
+        f"Classify the image at {path} as exactly one of these labels: "
+        f"{options}. {definitions}. "
         "Reply with ONLY the single lowercase word, nothing else."
     )
     try:
@@ -151,24 +205,24 @@ def classify_image(path: Path) -> str:
         )
         out = (result.stdout or "").strip().lower().splitlines()
         label = out[-1].strip() if out else ""
-        if label in IMAGE_CATEGORIES:
+        if label in enabled:
             log.info("classified %s -> %s (claude)", path.name, label)
             return label
         log.warning("classifier returned unexpected output: %r", result.stdout)
     except Exception as e:
         log.error("classifier failed: %s", e)
-    return "photo"
+    return "photo" if "photo" in enabled else enabled[0]
 
 
 def reclassify_if_image(path: Path, mimetype: str | None) -> Path:
-    """If path is an image saved to PHOTOS_DIR, classify and move if needed."""
+    """Move image to its proper subcategory folder if it isn't already there."""
     if not mimetype or not mimetype.startswith("image/"):
         return path
-    if path.parent != PHOTOS_DIR:
-        return path
     label = classify_image(path)
-    target = IMAGE_CATEGORIES[label]
-    if target == path.parent:
+    if not label:
+        return path
+    target = category_dir(label)
+    if not target or target == path.parent:
         return path
     new_path = unique_path(target, path.name)
     path.rename(new_path)
@@ -210,40 +264,46 @@ def download_youtube(
     url: str, rename: str | None = None
 ) -> tuple[Path | None, Path | None]:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    videos_dir = CATEGORY_DIRS.get("videos")
+    sounds_dir = CATEGORY_DIRS.get("sounds")
 
-    if rename:
-        video_tmpl = str(VIDEOS_DIR / f"{rename}.%(ext)s")
-        audio_tmpl = str(SOUNDS_DIR / f"{rename}.%(ext)s")
-    else:
-        video_tmpl = str(VIDEOS_DIR / f"%(title)s__{stamp}.%(ext)s")
-        audio_tmpl = str(SOUNDS_DIR / f"%(title)s__{stamp}.%(ext)s")
-    video_proc = subprocess.run(
-        [
-            "yt-dlp",
-            "-f",
-            "bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/best[vcodec!=none]",
-            "--merge-output-format",
-            "mp4",
-            "--remux-video",
-            "mp4",
-            "--print",
-            "after_move:filepath",
-            "-o",
-            video_tmpl,
-            url,
-        ],
-        capture_output=True,
-        text=True,
-    )
     video_path: Path | None = None
-    if video_proc.returncode == 0:
-        out = video_proc.stdout.strip().splitlines()
-        if out:
-            video_path = Path(out[-1])
-            log.info("saved youtube video -> %s", video_path)
-    else:
-        log.error("yt-dlp video failed: %s", video_proc.stderr.strip()[-500:])
+    if videos_dir:
+        video_tmpl = str(
+            videos_dir / (f"{rename}.%(ext)s" if rename else f"%(title)s__{stamp}.%(ext)s")
+        )
+        video_proc = subprocess.run(
+            [
+                "yt-dlp",
+                "-f",
+                "bv*[ext=mp4]+ba[ext=m4a]/bv*+ba/best[vcodec!=none]",
+                "--merge-output-format",
+                "mp4",
+                "--remux-video",
+                "mp4",
+                "--print",
+                "after_move:filepath",
+                "-o",
+                video_tmpl,
+                url,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if video_proc.returncode == 0:
+            out = video_proc.stdout.strip().splitlines()
+            if out:
+                video_path = Path(out[-1])
+                log.info("saved youtube video -> %s", video_path)
+        else:
+            log.error("yt-dlp video failed: %s", video_proc.stderr.strip()[-500:])
 
+    if not sounds_dir:
+        return video_path, None
+
+    audio_tmpl = str(
+        sounds_dir / (f"{rename}.%(ext)s" if rename else f"%(title)s__{stamp}.%(ext)s")
+    )
     audio_proc = subprocess.run(
         [
             "yt-dlp",

@@ -1,6 +1,6 @@
 # slack-assets-bot
 
-A personal Slack bot that turns your DMs into an asset library. Drop a file, paste a YouTube link, send any image URL — it sorts everything into `~/assets/{screenshots,photos,videos,sounds}/` on your machine.
+A personal Slack bot that turns your DMs into an asset library. Drop a file, paste a YouTube link, send any image URL — it sorts everything into category folders on your machine. You pick the categories during setup.
 
 ```
 you  → 📎 screenshot.png        bot → ✓ ~/assets/screenshots/screenshot.png
@@ -47,7 +47,7 @@ Don't have Claude Code? Skip step 2 — the bot still works, you just won't get 
 5. **App Home** → toggle **Messages Tab ON** and tick **"Allow users to send Slash commands and messages from the messages tab"**.
 6. In Slack, find the bot in your sidebar and open a DM with it.
 
-### 2. Run it locally
+### 2. Install and configure
 
 ```bash
 git clone https://github.com/louisedesadeleer/slack-assets-bot.git
@@ -55,25 +55,37 @@ cd slack-assets-bot
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
-# paste your two tokens into .env
+python setup.py
+```
+
+The setup wizard asks you:
+- **What to name your assets folder** (default: `~/assets`)
+- **Which categories you want** — checkbox list. Default 4: screenshots, photos, videos, sounds. Opt-in extras: memes, thumbnails. Pick whichever fits how you organize stuff.
+- **Your Slack tokens** (from step 1)
+- **Authorized Slack user IDs** — leave empty for now if you don't know yours
+
+It writes `.env` and creates the chosen folders.
+
+### 3. Run the bot
+
+```bash
 python bot.py
 ```
 
-You should see `assets bot starting, saving to ~/assets`.
+You should see `assets bot starting, saving to ...`.
 
-### 3. Authorize yourself
+### 4. Authorize yourself
 
 The bot installs at the workspace level, which means anyone in your Slack workspace can DM it. To prevent that, every message is checked against `ALLOWED_SLACK_USERS` in `.env` — empty by default, so the bot refuses all messages until you add your ID.
 
 1. DM the bot anything (e.g. "hi").
 2. It'll reply with `Your Slack user ID is U01234ABCD`.
-3. Paste that ID into `.env` as `ALLOWED_SLACK_USERS=U01234ABCD` (comma-separated if you want to authorize multiple people).
-4. Restart the bot (`Ctrl+C` and `python bot.py` again).
+3. Paste that ID into `.env` as `ALLOWED_SLACK_USERS=U01234ABCD` (comma-separated to authorize multiple people).
+4. Restart the bot.
 
 Now DM the bot a file or a link — it'll reply in-thread with the saved path.
 
-### 4. Keep it running in the background (macOS)
+### 5. Keep it running in the background (macOS)
 
 ```bash
 cat > ~/Library/LaunchAgents/com.assetsbot.plist <<'EOF'
@@ -119,6 +131,8 @@ Multiple files in one message with the same rename get `_1`, `_2` suffixes. YouT
 
 ## Folder layout
 
+The folder you picked during setup gets one subfolder per category you enabled. Example with the defaults:
+
 ```
 ~/assets/
 ├── screenshots/   # CleanShot, Screenshot, anything classified as UI
@@ -126,6 +140,8 @@ Multiple files in one message with the same rename get `_1`, `_2` suffixes. YouT
 ├── videos/        # .mp4 from YouTube + any video file uploads
 └── sounds/        # .mp3 from YouTube + any audio file uploads
 ```
+
+If you opt into `memes` or `thumbnails`, those folders are added and the Claude classifier learns to route to them too.
 
 ## License
 
