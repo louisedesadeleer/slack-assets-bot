@@ -1,0 +1,29 @@
+display_information:
+  name: Assets Bot
+  description: Drop files or links, they land in ~/assets/
+  background_color: "#1a1d21"
+features:
+  bot_user:
+    display_name: Assets Bot
+    always_online: true
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - files:read
+      - im:history
+      - im:read
+      - im:write
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.im
+      - file_shared
+  interactivity:
+    is_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false
