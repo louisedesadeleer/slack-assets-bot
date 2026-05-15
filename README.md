@@ -2,6 +2,12 @@
 
 ![slack-assets-bot](./banner.png)
 
+In an age of agentic video editing and AI-generated content, the thing that makes your work feel like *yours* isn't the engine — it's the taste you bring to it. The meme you remembered. The screenshot of that one tweet. The clip you've been saving since 2019. The sound effect that always lands.
+
+**This bot is a low-friction way to keep that library at hand.** Drop anything into a Slack DM — files, YouTube links, image URLs — and it lands organized on your machine, named so Claude (or you) can find it later. Build the asset bank, then let the agents do the editing.
+
+---
+
 A personal Slack bot that turns your DMs into an asset library. Drop a file, paste a YouTube link, send any image URL — it sorts everything into category folders on your machine. You pick the categories during setup.
 
 ```
