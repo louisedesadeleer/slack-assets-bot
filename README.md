@@ -2,7 +2,7 @@
 
 ![slack-assets-bot](./banner.png)
 
-In an age of agentic video editing and AI-generated content, the thing that makes your work feel like *yours* isn't the engine — it's the taste you bring to it. The meme you remembered. The screenshot of that one tweet. The clip you've been saving since 2019. The sound effect that always lands.
+In an age of agentic video editing and AI-generated content, the thing that makes your work feel like *yours* is the taste you bring to your videos and content. The niche meme you remembered. The screenshot of that one tweet. The song only your audience will know. The sound effect that always lands.
 
 **This bot is a low-friction way to keep that library at hand.** Drop anything into a Slack DM — files, YouTube links, image URLs — and it lands organized on your machine, named so Claude (or you) can find it later. Build the asset bank, then let the agents do the editing.
 
