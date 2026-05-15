@@ -133,6 +133,10 @@ RENAME_START_RE = re.compile(
     r"^\s*(?:save\s+as|rename|name)\s+([^\n<>|]+?)\s*(?:\n|$)",
     re.IGNORECASE | re.MULTILINE,
 )
+PROJECT_RE = re.compile(
+    r"project\s*[:=]\s*([^\n<>|]+?)\s*(?:\n|$)",
+    re.IGNORECASE,
+)
 
 
 def extract_rename(text: str) -> str | None:
@@ -144,6 +148,31 @@ def extract_rename(text: str) -> str | None:
     if not candidate:
         return None
     return safe_name(candidate)
+
+
+def extract_project(text: str) -> str | None:
+    m = PROJECT_RE.search(text or "")
+    if not m:
+        return None
+    candidate = m.group(1).strip()
+    candidate = URL_RE.sub("", candidate).strip()
+    if not candidate:
+        return None
+    slug = re.sub(r"[^a-z0-9_-]+", "-", candidate.lower()).strip("-")
+    return slug or None
+
+
+def project_dir(category_dir_path: Path, project: str | None) -> Path:
+    """Return the right folder for `category_dir_path`, scoped to `project`.
+
+    Without a project: returns the category dir as-is.
+    With a project: returns ASSETS_DIR/projects/<project>/<category>/.
+    """
+    if not project:
+        return category_dir_path
+    target = ASSETS_DIR / "projects" / project / category_dir_path.name
+    target.mkdir(parents=True, exist_ok=True)
+    return target
 
 
 def safe_name(name: str) -> str:
@@ -282,12 +311,15 @@ def auto_name_image(path: Path) -> str | None:
     return None
 
 
-def reclassify_if_image(path: Path, mimetype: str | None) -> Path:
+def reclassify_if_image(
+    path: Path, mimetype: str | None, project: str | None = None
+) -> Path:
     """For images: pick the right category folder, optionally rename via claude."""
     if not mimetype or not mimetype.startswith("image/"):
         return path
     label = classify_image(path)
-    target = category_dir(label) if label else path.parent
+    category_path = category_dir(label) if label else path.parent
+    target = project_dir(category_path, project) if category_path else path.parent
 
     final_name = path.name
     if AUTO_NAME_IMAGES and is_generic_image_name(path.name):
@@ -302,7 +334,9 @@ def reclassify_if_image(path: Path, mimetype: str | None) -> Path:
     return new_path
 
 
-def download_slack_file(file_obj: dict, rename: str | None = None) -> Path | None:
+def download_slack_file(
+    file_obj: dict, rename: str | None = None, project: str | None = None
+) -> Path | None:
     url = file_obj.get("url_private_download") or file_obj.get("url_private")
     if not url:
         return None
@@ -310,6 +344,7 @@ def download_slack_file(file_obj: dict, rename: str | None = None) -> Path | Non
     if not target:
         log.info("skipping file, unsupported mimetype: %s", file_obj.get("mimetype"))
         return None
+    target = project_dir(target, project)
     original = file_obj.get("name") or "file"
     if rename:
         ext = Path(original).suffix
@@ -328,16 +363,20 @@ def download_slack_file(file_obj: dict, rename: str | None = None) -> Path | Non
         for chunk in r.iter_content(8192):
             f.write(chunk)
     log.info("saved slack file -> %s", path)
-    path = reclassify_if_image(path, file_obj.get("mimetype"))
+    path = reclassify_if_image(path, file_obj.get("mimetype"), project=project)
     return path
 
 
 def download_youtube(
-    url: str, rename: str | None = None
+    url: str, rename: str | None = None, project: str | None = None
 ) -> tuple[Path | None, Path | None]:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     videos_dir = CATEGORY_DIRS.get("videos")
     sounds_dir = CATEGORY_DIRS.get("sounds")
+    if videos_dir:
+        videos_dir = project_dir(videos_dir, project)
+    if sounds_dir:
+        sounds_dir = project_dir(sounds_dir, project)
 
     video_path: Path | None = None
     if videos_dir:
@@ -403,7 +442,9 @@ def download_youtube(
     return video_path, audio_path
 
 
-def download_generic_url(url: str, rename: str | None = None) -> Path | None:
+def download_generic_url(
+    url: str, rename: str | None = None, project: str | None = None
+) -> Path | None:
     try:
         head = requests.head(url, allow_redirects=True, timeout=15)
         content_type = head.headers.get("Content-Type", "").split(";")[0].strip()
@@ -418,6 +459,7 @@ def download_generic_url(url: str, rename: str | None = None) -> Path | None:
     if not target:
         log.info("unknown content type for %s (got %s)", url, content_type)
         return None
+    target = project_dir(target, project)
 
     if rename:
         name = rename
@@ -436,7 +478,7 @@ def download_generic_url(url: str, rename: str | None = None) -> Path | None:
         for chunk in r.iter_content(8192):
             f.write(chunk)
     log.info("saved url -> %s", path)
-    path = reclassify_if_image(path, content_type)
+    path = reclassify_if_image(path, content_type, project=project)
     return path
 
 
@@ -445,12 +487,13 @@ def process_message(event: dict, say) -> None:
     files = event.get("files", []) or []
     thread_ts = event.get("ts")
     rename = extract_rename(text)
+    project = extract_project(text)
     saved: list[str] = []
     errors: list[str] = []
 
     for f in files:
         try:
-            p = download_slack_file(f, rename=rename)
+            p = download_slack_file(f, rename=rename, project=project)
             if p:
                 saved.append(f"`{p}`")
             else:
@@ -462,7 +505,7 @@ def process_message(event: dict, say) -> None:
     yt_urls = list(dict.fromkeys(YOUTUBE_RE.findall(text)))
     for url in yt_urls:
         try:
-            v, a = download_youtube(url, rename=rename)
+            v, a = download_youtube(url, rename=rename, project=project)
             if v:
                 saved.append(f"`{v}`")
             if a:
@@ -476,7 +519,7 @@ def process_message(event: dict, say) -> None:
     other_urls = [u for u in URL_RE.findall(text) if u not in yt_urls]
     for url in other_urls:
         try:
-            p = download_generic_url(url, rename=rename)
+            p = download_generic_url(url, rename=rename, project=project)
             if p:
                 saved.append(f"`{p}`")
             else:

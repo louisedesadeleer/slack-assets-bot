@@ -18,6 +18,7 @@ you  → name: kanye_laugh
 - **YouTube links** download both the `.mp4` (videos/) and the `.mp3` (sounds/).
 - **Other URLs** route by `Content-Type` — direct image/video/audio links work, web pages are ignored.
 - **Rename on the fly** by typing `name: foo` / `rename: foo` / `save as foo` in the message. Extension added automatically.
+- **Project tagging** — typing `project: kanye-launch` in the message routes the asset to `~/assets/projects/kanye-launch/<category>/` instead of the top-level category folder. Build asset bundles per video/campaign on the fly.
 - **Auto-naming for images** — files with generic names (`CleanShot_…`, `Screenshot…`, `IMG_…`) get a descriptive slug from Claude vision (e.g. `team_dashboard.png`, `kanye_west_laughing.png`) so AI assistants can find them later by name. Skipped when you provide a manual rename.
 - **Private by default** — the setup wizard asks who can use the bot (just you / specific teammates / whole workspace) and locks it down accordingly.
 
@@ -137,7 +138,9 @@ Replace `REPLACE_WITH_REPO_PATH` with the absolute path to your clone. Logs live
 
 Stop with `launchctl unload ~/Library/LaunchAgents/com.assetsbot.plist`.
 
-## Rename syntax
+## Message syntax
+
+### Rename
 
 | You type | Result |
 |---|---|
@@ -149,19 +152,42 @@ Stop with `launchctl unload ~/Library/LaunchAgents/com.assetsbot.plist`.
 
 Multiple files in one message with the same rename get `_1`, `_2` suffixes. YouTube uses the same name for both the `.mp4` and `.mp3`.
 
+### Project tagging
+
+| You type | Result |
+|---|---|
+| `project: kanye-launch` + 📎 screenshot.png | `~/assets/projects/kanye-launch/screenshots/screenshot.png` |
+| `project: Q4 Brand Refresh` + YouTube link | `~/assets/projects/q4-brand-refresh/videos/...mp4` + `.../sounds/...mp3` |
+| `project=demo-2026` + image URL | `~/assets/projects/demo-2026/photos/...` |
+
+Project names are slug-ified (lowercased, non-alphanumeric → `-`). Folders are created on demand. Combine freely with `name:` and `project:`:
+
+```
+project: kanye-launch  name: opening-shot
+📎 hero.mp4
+→ ~/assets/projects/kanye-launch/videos/opening-shot.mp4
+```
+
 ## Folder layout
 
-The folder you picked during setup gets one subfolder per category you enabled. Example with the defaults:
+The folder you picked during setup gets one subfolder per category you enabled, plus a `projects/` namespace for project-tagged assets:
 
 ```
 ~/assets/
-├── screenshots/   # CleanShot, Screenshot, anything classified as UI
-├── photos/        # everything else: real-world shots, memes, designed images
-├── videos/        # .mp4 from YouTube + any video file uploads
-└── sounds/        # .mp3 from YouTube + any audio file uploads
+├── screenshots/                # untagged screenshots
+├── photos/                     # untagged photos
+├── videos/                     # untagged videos
+├── sounds/                     # untagged sounds
+└── projects/
+    ├── kanye-launch/
+    │   ├── screenshots/
+    │   ├── videos/
+    │   └── sounds/
+    └── q4-brand-refresh/
+        └── photos/
 ```
 
-If you opt into `memes` or `thumbnails`, those folders are added and the Claude classifier learns to route to them too.
+If you opt into `memes` or `thumbnails` during setup, those folders are added too. Project folders mirror whichever categories you enabled.
 
 ## License
 
