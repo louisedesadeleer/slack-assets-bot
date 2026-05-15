@@ -27,16 +27,20 @@ load_dotenv()
 ASSETS_DIR = Path.home() / "assets"
 PHOTOS_DIR = ASSETS_DIR / "photos"
 SCREENSHOTS_DIR = ASSETS_DIR / "screenshots"
-THUMBNAILS_DIR = ASSETS_DIR / "thumbnails"
 VIDEOS_DIR = ASSETS_DIR / "videos"
 SOUNDS_DIR = ASSETS_DIR / "sounds"
-for d in (PHOTOS_DIR, SCREENSHOTS_DIR, THUMBNAILS_DIR, VIDEOS_DIR, SOUNDS_DIR):
+for d in (PHOTOS_DIR, SCREENSHOTS_DIR, VIDEOS_DIR, SOUNDS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 
 IMAGE_CATEGORIES = {
     "screenshot": SCREENSHOTS_DIR,
     "photo": PHOTOS_DIR,
-    "thumbnail": THUMBNAILS_DIR,
+}
+
+ALLOWED_SLACK_USERS = {
+    u.strip()
+    for u in os.environ.get("ALLOWED_SLACK_USERS", "").split(",")
+    if u.strip()
 }
 
 logging.basicConfig(
@@ -132,11 +136,10 @@ def classify_image(path: Path) -> str:
         return "photo"
 
     prompt = (
-        f"Classify the image at {path} as exactly one of these three labels: "
-        "screenshot, photo, thumbnail. A screenshot is a capture of a computer "
-        "or phone interface. A photo is a real-world picture taken with a "
-        "camera. A thumbnail is a designed cover image for video content "
-        "(usually 16:9 with overlaid text, faces, and bold styling). "
+        f"Classify the image at {path} as exactly one of these two labels: "
+        "screenshot, photo. A screenshot is a capture of a computer or phone "
+        "interface. A photo is anything else (a real-world picture, a meme, "
+        "a designed image, artwork, a cover image). "
         "Reply with ONLY the single lowercase word, nothing else."
     )
     try:
@@ -370,6 +373,37 @@ def handle_message(event, say):
         return
     if event.get("channel_type") != "im":
         return
+    user_id = event.get("user")
+    if not user_id:
+        return
+    if not ALLOWED_SLACK_USERS:
+        log.warning(
+            "ALLOWED_SLACK_USERS is empty — refusing message from %s. "
+            "Set ALLOWED_SLACK_USERS in .env to authorize yourself.",
+            user_id,
+        )
+        say(
+            text=(
+                f"Hi! This bot is private and doesn't have any authorized "
+                f"users yet.\nYour Slack user ID is `{user_id}` — the owner "
+                f"can add it to `ALLOWED_SLACK_USERS` in `.env` to authorize "
+                f"you, then restart the bot."
+            ),
+            thread_ts=event.get("ts"),
+        )
+        return
+    if user_id not in ALLOWED_SLACK_USERS:
+        log.warning("unauthorized message from %s", user_id)
+        say(
+            text=(
+                f"Hi! This bot is private and not configured to handle "
+                f"requests from your account. Your Slack user ID for "
+                f"reference: `{user_id}`."
+            ),
+            thread_ts=event.get("ts"),
+        )
+        return
+    log.info("message from %s in %s", user_id, event.get("channel"))
     threading.Thread(
         target=process_message, args=(event, say), daemon=True
     ).start()

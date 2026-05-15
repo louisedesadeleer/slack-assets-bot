@@ -1,6 +1,6 @@
 # slack-assets-bot
 
-A personal Slack bot that turns your DMs into an asset library. Drop a file, paste a YouTube link, send any image URL — it sorts everything into `~/assets/{screenshots,photos,thumbnails,videos,sounds}/` on your machine.
+A personal Slack bot that turns your DMs into an asset library. Drop a file, paste a YouTube link, send any image URL — it sorts everything into `~/assets/{screenshots,photos,videos,sounds}/` on your machine.
 
 ```
 you  → 📎 screenshot.png        bot → ✓ ~/assets/screenshots/screenshot.png
@@ -12,20 +12,21 @@ you  → name: kanye_laugh
 
 ## What it does
 
-- **Files** route by mimetype — images go through a classifier (screenshot vs photo vs thumbnail), videos to `videos/`, audio to `sounds/`.
+- **Files** route by mimetype — images go through a classifier (screenshot vs photo), videos to `videos/`, audio to `sounds/`.
 - **YouTube links** download both the `.mp4` (videos/) and the `.mp3` (sounds/).
 - **Other URLs** route by `Content-Type` — direct image/video/audio links work, web pages are ignored.
 - **Rename on the fly** by typing `name: foo` / `rename: foo` / `save as foo` in the message. Extension added automatically.
+- **Private to you** — only Slack user IDs you authorize in `.env` can use the bot. Anyone else gets a polite refusal.
 
 ## Image classification
 
-Uploaded images get classified into `screenshots/`, `photos/`, or `thumbnails/`:
+Uploaded images get classified into `screenshots/` or `photos/`:
 
 1. **Filename pre-check** (free, instant) — `CleanShot*`, `Screenshot*`, etc. → `screenshots/`
 2. **`claude` CLI vision call** — if Claude Code is installed, the bot shells out to `claude -p` for everything else. Uses your Claude Pro/Max subscription, no extra API cost. ~10s per image.
 3. **Fallback** — if neither matches, images land in `photos/`.
 
-Don't have Claude Code? Skip step 2 — the bot still works, you just won't get the photo/thumbnail split.
+Don't have Claude Code? Skip step 2 — the bot still works, you just won't get the screenshot/photo split.
 
 ## Requirements
 
@@ -59,9 +60,20 @@ cp .env.example .env
 python bot.py
 ```
 
-You should see `assets bot starting, saving to ~/assets`. DM the bot a file or link and it'll reply in-thread with the saved path.
+You should see `assets bot starting, saving to ~/assets`.
 
-### 3. Keep it running in the background (macOS)
+### 3. Authorize yourself
+
+The bot installs at the workspace level, which means anyone in your Slack workspace can DM it. To prevent that, every message is checked against `ALLOWED_SLACK_USERS` in `.env` — empty by default, so the bot refuses all messages until you add your ID.
+
+1. DM the bot anything (e.g. "hi").
+2. It'll reply with `Your Slack user ID is U01234ABCD`.
+3. Paste that ID into `.env` as `ALLOWED_SLACK_USERS=U01234ABCD` (comma-separated if you want to authorize multiple people).
+4. Restart the bot (`Ctrl+C` and `python bot.py` again).
+
+Now DM the bot a file or a link — it'll reply in-thread with the saved path.
+
+### 4. Keep it running in the background (macOS)
 
 ```bash
 cat > ~/Library/LaunchAgents/com.assetsbot.plist <<'EOF'
@@ -110,8 +122,7 @@ Multiple files in one message with the same rename get `_1`, `_2` suffixes. YouT
 ```
 ~/assets/
 ├── screenshots/   # CleanShot, Screenshot, anything classified as UI
-├── photos/        # real-world camera shots, default for ambiguous images
-├── thumbnails/    # YouTube/social cover art (16:9 with overlay text)
+├── photos/        # everything else: real-world shots, memes, designed images
 ├── videos/        # .mp4 from YouTube + any video file uploads
 └── sounds/        # .mp3 from YouTube + any audio file uploads
 ```
