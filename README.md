@@ -1,5 +1,7 @@
 # slack-assets-bot
 
+![slack-assets-bot](./banner.png)
+
 A personal Slack bot that turns your DMs into an asset library. Drop a file, paste a YouTube link, send any image URL — it sorts everything into category folders on your machine. You pick the categories during setup.
 
 ```
