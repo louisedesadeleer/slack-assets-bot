@@ -162,11 +162,14 @@ Multiple files in one message with the same rename get `_1`, `_2` suffixes. YouT
 
 | You type | Result |
 |---|---|
-| `project: kanye-launch` + 📎 screenshot.png | `~/assets/projects/kanye-launch/screenshots/screenshot.png` |
+| 📎 screenshot.png + `morning routine video` | `~/assets/projects/morning-routine-video/screenshots/...` |
+| 📎 hero.mp4 + `kanye launch` | `~/assets/projects/kanye-launch/videos/hero.mp4` |
 | `project: Q4 Brand Refresh` + YouTube link | `~/assets/projects/q4-brand-refresh/videos/...mp4` + `.../sounds/...mp3` |
 | `project=demo-2026` + image URL | `~/assets/projects/demo-2026/photos/...` |
 
-Project names are slug-ified (lowercased, non-alphanumeric → `-`). Folders are created on demand. Combine freely with `name:` and `project:`:
+**Smart detection:** when you drop a **file** with a short caption (1–6 words, no URLs, no `name:` directive), the caption becomes the project name automatically. For URL-only messages, the explicit `project:` keyword is required (so commentary like "check this out" doesn't accidentally make a project).
+
+Project names are slug-ified (lowercased, non-alphanumeric → `-`). Folders are created on demand. Combine freely with `name:`:
 
 ```
 project: kanye-launch  name: opening-shot

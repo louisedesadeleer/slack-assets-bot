@@ -150,16 +150,45 @@ def extract_rename(text: str) -> str | None:
     return safe_name(candidate)
 
 
+def _slugify(value: str) -> str | None:
+    slug = re.sub(r"[^a-z0-9_-]+", "-", value.lower()).strip("-")
+    return slug or None
+
+
 def extract_project(text: str) -> str | None:
+    """Pick out an explicit `project: foo` directive."""
     m = PROJECT_RE.search(text or "")
     if not m:
         return None
     candidate = m.group(1).strip()
     candidate = URL_RE.sub("", candidate).strip()
-    if not candidate:
+    return _slugify(candidate) if candidate else None
+
+
+def extract_caption_as_project(text: str) -> str | None:
+    """Treat a short caption (no keywords, no URLs) as an implicit project name.
+
+    Examples:
+      'morning routine video' -> 'morning-routine-video'
+      'kanye launch'          -> 'kanye-launch'
+      'lol this is so funny'  -> 'lol-this-is-so-funny' (yes, this is a project)
+      'check this out https://...'   -> None (URL present)
+      'name: foo'                    -> None (rename directive)
+      'a long sentence with more than six words is probably commentary' -> None
+    """
+    if not text:
         return None
-    slug = re.sub(r"[^a-z0-9_-]+", "-", candidate.lower()).strip("-")
-    return slug or None
+    cleaned = URL_RE.sub("", text)
+    cleaned = RENAME_INLINE_RE.sub("", cleaned)
+    cleaned = RENAME_START_RE.sub("", cleaned)
+    cleaned = PROJECT_RE.sub("", cleaned)
+    cleaned = cleaned.strip()
+    if not cleaned:
+        return None
+    words = cleaned.split()
+    if not (1 <= len(words) <= 6):
+        return None
+    return _slugify(cleaned)
 
 
 def project_dir(category_dir_path: Path, project: str | None) -> Path:
@@ -504,6 +533,8 @@ def process_message(event: dict, say) -> None:
     thread_ts = event.get("ts")
     rename = extract_rename(text)
     project = extract_project(text)
+    if not project and files:
+        project = extract_caption_as_project(text)
     saved: list[str] = []
     errors: list[str] = []
 
