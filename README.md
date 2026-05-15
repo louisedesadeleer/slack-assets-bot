@@ -114,35 +114,21 @@ Now DM the bot a file or a link — it'll reply in-thread with the saved path.
 
 ### 5. Keep it running in the background (macOS)
 
-```bash
-cat > ~/Library/LaunchAgents/com.assetsbot.plist <<'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>com.assetsbot</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>REPLACE_WITH_REPO_PATH/.venv/bin/python</string>
-    <string>REPLACE_WITH_REPO_PATH/bot.py</string>
-  </array>
-  <key>WorkingDirectory</key><string>REPLACE_WITH_REPO_PATH</string>
-  <key>EnvironmentVariables</key>
-  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>REPLACE_WITH_REPO_PATH/bot.log</string>
-  <key>StandardErrorPath</key><string>REPLACE_WITH_REPO_PATH/bot.log</string>
-</dict>
-</plist>
-EOF
+`python setup.py` offers to install a **LaunchAgent** as its last step. Say yes and the bot:
 
-launchctl load ~/Library/LaunchAgents/com.assetsbot.plist
+- Starts immediately
+- Auto-starts at every login
+- Auto-restarts within seconds if it crashes, your Mac sleeps, or the Python process dies for any reason
+
+Logs go to `bot.log` in the repo. To stop it:
+
+```bash
+launchctl unload ~/Library/LaunchAgents/com.assetsbot.plist
 ```
 
-Replace `REPLACE_WITH_REPO_PATH` with the absolute path to your clone. Logs live at `bot.log`.
+To re-enable: `launchctl load ~/Library/LaunchAgents/com.assetsbot.plist` (or re-run `python setup.py`).
 
-Stop with `launchctl unload ~/Library/LaunchAgents/com.assetsbot.plist`.
+If you skipped this during setup, re-run `python setup.py` — it's idempotent and remembers your previous answers as defaults.
 
 ## Message syntax
 
