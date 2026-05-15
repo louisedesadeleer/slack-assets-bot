@@ -77,19 +77,77 @@ def main() -> None:
         default=env.get("SLACK_APP_TOKEN", ""),
     ).ask() or ""
 
-    allowed_users = questionary.text(
-        "Slack user IDs allowed to use this bot, comma-separated "
-        "(leave empty to discover yours by DMing the bot once)",
-        default=env.get("ALLOWED_SLACK_USERS", ""),
-    ).ask() or ""
+    print(
+        "\n  ⚠️  Anyone in your Slack workspace can DM the bot. Since the\n"
+        "      bot saves files to YOUR computer, you probably want to lock\n"
+        "      it down to just you (or specific teammates).\n"
+    )
+    scope = questionary.select(
+        "Who should be able to use this bot?",
+        choices=[
+            questionary.Choice(
+                "Just me (private) — bot refuses everyone else",
+                value="private",
+            ),
+            questionary.Choice(
+                "Me + specific teammates — I'll paste their Slack user IDs",
+                value="allowlist",
+            ),
+            questionary.Choice(
+                "Anyone in my Slack workspace (NOT recommended unless solo workspace)",
+                value="workspace",
+            ),
+        ],
+    ).ask()
+
+    allow_workspace = "true" if scope == "workspace" else ""
+    if scope == "workspace":
+        confirm = questionary.confirm(
+            "Are you sure? Every workspace member will be able to drop files "
+            "onto your machine.",
+            default=False,
+        ).ask()
+        if not confirm:
+            scope = "private"
+            allow_workspace = ""
+
+    if scope == "private":
+        print(
+            "\n  Tip: leave the field below empty if you don't know your\n"
+            "  Slack user ID — DM the bot once and it'll tell you.\n"
+        )
+        allowed_users = questionary.text(
+            "Your Slack user ID (e.g. U01234ABCD)",
+            default=env.get("ALLOWED_SLACK_USERS", ""),
+        ).ask() or ""
+    elif scope == "allowlist":
+        print(
+            "\n  Find a user's Slack ID: open their profile in Slack →\n"
+            "  ⋮ menu → 'Copy member ID'.\n"
+        )
+        allowed_users = questionary.text(
+            "Slack user IDs, comma-separated",
+            default=env.get("ALLOWED_SLACK_USERS", ""),
+        ).ask() or ""
+    else:
+        allowed_users = ""
+
+    auto_name = questionary.confirm(
+        "Auto-name images using Claude vision? (e.g. CleanShot_2026...png "
+        "becomes team_dashboard.png so you can find it later by saying "
+        "'use the team dashboard image')",
+        default=True,
+    ).ask()
 
     env_text = "\n".join(
         [
             f"SLACK_BOT_TOKEN={bot_token}",
             f"SLACK_APP_TOKEN={app_token}",
             f"ALLOWED_SLACK_USERS={allowed_users}",
+            f"ALLOW_WORKSPACE={allow_workspace}",
             f"ASSETS_DIR={assets_dir}",
             f"CATEGORIES={','.join(selected)}",
+            f"AUTO_NAME_IMAGES={'true' if auto_name else 'false'}",
             "",
         ]
     )

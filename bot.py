@@ -77,6 +77,39 @@ ALLOWED_SLACK_USERS = {
     for u in os.environ.get("ALLOWED_SLACK_USERS", "").split(",")
     if u.strip()
 }
+ALLOW_WORKSPACE = os.environ.get("ALLOW_WORKSPACE", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+AUTO_NAME_IMAGES = os.environ.get("AUTO_NAME_IMAGES", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+GENERIC_NAME_PREFIXES = (
+    "cleanshot",
+    "screenshot",
+    "screen_shot",
+    "screen-shot",
+    "screen shot",
+    "untitled",
+    "image",
+    "img_",
+    "img-",
+    "photo_",
+    "photo-",
+    "snip",
+    "capture",
+    "download",
+    "unnamed",
+)
+
+
+def is_generic_image_name(name: str) -> bool:
+    stem = Path(name).stem.lower()
+    return any(stem.startswith(p) for p in GENERIC_NAME_PREFIXES)
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
@@ -214,19 +247,58 @@ def classify_image(path: Path) -> str | None:
     return "photo" if "photo" in enabled else enabled[0]
 
 
+def auto_name_image(path: Path) -> str | None:
+    """Ask claude vision for a short descriptive filename slug for an image.
+
+    Returns a slug like 'kanye_west_laughing' or None if claude isn't
+    available or the call fails. The slug is sanitized to [a-z0-9_].
+    """
+    if not shutil.which("claude"):
+        return None
+    prompt = (
+        f"Look at the image at {path} and describe its main subject in 2 to "
+        "5 lowercase words separated by underscores. This will be used as a "
+        "filename so an AI assistant can find it later by name. Examples: "
+        "kanye_west_laughing, drake_pointing, team_dashboard, "
+        "iphone_settings_menu, pink_grass_field, distracted_boyfriend_meme. "
+        "Reply with ONLY the slug, no extension, no quotes, no other text."
+    )
+    try:
+        result = subprocess.run(
+            ["claude", "-p", prompt],
+            capture_output=True,
+            text=True,
+            timeout=90,
+        )
+        out = (result.stdout or "").strip().lower().splitlines()
+        candidate = out[-1].strip() if out else ""
+        slug = re.sub(r"[^a-z0-9_]+", "_", candidate).strip("_")
+        if 2 <= len(slug) <= 80 and "_" in slug or 2 <= len(slug) <= 30:
+            log.info("auto-named %s -> %s", path.name, slug)
+            return slug
+        log.warning("auto-name returned unusable slug: %r", candidate)
+    except Exception as e:
+        log.error("auto-name failed: %s", e)
+    return None
+
+
 def reclassify_if_image(path: Path, mimetype: str | None) -> Path:
-    """Move image to its proper subcategory folder if it isn't already there."""
+    """For images: pick the right category folder, optionally rename via claude."""
     if not mimetype or not mimetype.startswith("image/"):
         return path
     label = classify_image(path)
-    if not label:
+    target = category_dir(label) if label else path.parent
+
+    final_name = path.name
+    if AUTO_NAME_IMAGES and is_generic_image_name(path.name):
+        if slug := auto_name_image(path):
+            final_name = slug + path.suffix
+
+    if target == path.parent and final_name == path.name:
         return path
-    target = category_dir(label)
-    if not target or target == path.parent:
-        return path
-    new_path = unique_path(target, path.name)
+    new_path = unique_path(target or path.parent, final_name)
     path.rename(new_path)
-    log.info("moved %s -> %s", path.name, new_path)
+    log.info("placed %s -> %s", path.name, new_path)
     return new_path
 
 
@@ -436,33 +508,34 @@ def handle_message(event, say):
     user_id = event.get("user")
     if not user_id:
         return
-    if not ALLOWED_SLACK_USERS:
-        log.warning(
-            "ALLOWED_SLACK_USERS is empty — refusing message from %s. "
-            "Set ALLOWED_SLACK_USERS in .env to authorize yourself.",
-            user_id,
-        )
-        say(
-            text=(
-                f"Hi! This bot is private and doesn't have any authorized "
-                f"users yet.\nYour Slack user ID is `{user_id}` — the owner "
-                f"can add it to `ALLOWED_SLACK_USERS` in `.env` to authorize "
-                f"you, then restart the bot."
-            ),
-            thread_ts=event.get("ts"),
-        )
-        return
-    if user_id not in ALLOWED_SLACK_USERS:
-        log.warning("unauthorized message from %s", user_id)
-        say(
-            text=(
-                f"Hi! This bot is private and not configured to handle "
-                f"requests from your account. Your Slack user ID for "
-                f"reference: `{user_id}`."
-            ),
-            thread_ts=event.get("ts"),
-        )
-        return
+    if not ALLOW_WORKSPACE:
+        if not ALLOWED_SLACK_USERS:
+            log.warning(
+                "ALLOWED_SLACK_USERS is empty — refusing message from %s. "
+                "Set ALLOWED_SLACK_USERS in .env to authorize yourself.",
+                user_id,
+            )
+            say(
+                text=(
+                    f"Hi! This bot is private and doesn't have any authorized "
+                    f"users yet.\nYour Slack user ID is `{user_id}` — the owner "
+                    f"can add it to `ALLOWED_SLACK_USERS` in `.env` to authorize "
+                    f"you, then restart the bot."
+                ),
+                thread_ts=event.get("ts"),
+            )
+            return
+        if user_id not in ALLOWED_SLACK_USERS:
+            log.warning("unauthorized message from %s", user_id)
+            say(
+                text=(
+                    f"Hi! This bot is private and not configured to handle "
+                    f"requests from your account. Your Slack user ID for "
+                    f"reference: `{user_id}`."
+                ),
+                thread_ts=event.get("ts"),
+            )
+            return
     log.info("message from %s in %s", user_id, event.get("channel"))
     threading.Thread(
         target=process_message, args=(event, say), daemon=True

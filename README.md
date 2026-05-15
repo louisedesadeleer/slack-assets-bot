@@ -18,17 +18,26 @@ you  → name: kanye_laugh
 - **YouTube links** download both the `.mp4` (videos/) and the `.mp3` (sounds/).
 - **Other URLs** route by `Content-Type` — direct image/video/audio links work, web pages are ignored.
 - **Rename on the fly** by typing `name: foo` / `rename: foo` / `save as foo` in the message. Extension added automatically.
-- **Private to you** — only Slack user IDs you authorize in `.env` can use the bot. Anyone else gets a polite refusal.
+- **Auto-naming for images** — files with generic names (`CleanShot_…`, `Screenshot…`, `IMG_…`) get a descriptive slug from Claude vision (e.g. `team_dashboard.png`, `kanye_west_laughing.png`) so AI assistants can find them later by name. Skipped when you provide a manual rename.
+- **Private by default** — the setup wizard asks who can use the bot (just you / specific teammates / whole workspace) and locks it down accordingly.
 
-## Image classification
+## Image classification & auto-naming
 
-Uploaded images get classified into `screenshots/` or `photos/`:
+Uploaded images get two passes:
 
-1. **Filename pre-check** (free, instant) — `CleanShot*`, `Screenshot*`, etc. → `screenshots/`
-2. **`claude` CLI vision call** — if Claude Code is installed, the bot shells out to `claude -p` for everything else. Uses your Claude Pro/Max subscription, no extra API cost. ~10s per image.
-3. **Fallback** — if neither matches, images land in `photos/`.
+**Where to put it** (folder):
+1. Filename pre-check — `CleanShot*`, `Screenshot*`, etc. → `screenshots/`
+2. `claude` CLI vision call for everything else → `screenshots/` or `photos/`
+3. Fallback: `photos/`
 
-Don't have Claude Code? Skip step 2 — the bot still works, you just won't get the screenshot/photo split.
+**What to call it** (filename), when `AUTO_NAME_IMAGES=true`:
+1. If you typed `name: foo` in the message → `foo.ext`
+2. If the original filename looks generic (`CleanShot_2026…`, `IMG_1234`, `screenshot.png`) → `claude` describes the image in 2–5 words → `team_dashboard.png`, `kanye_west_laughing.png`, `iphone_settings_menu.png`
+3. Otherwise the original name is kept
+
+This makes the asset library searchable by content. Later, when editing in another tool, you (or another agent) can say *"use the kanye meme"* and it finds the file by name.
+
+Don't have Claude Code? Both steps degrade — images all land in `photos/` with original filenames. The bot still works.
 
 ## Requirements
 
@@ -76,14 +85,23 @@ python bot.py
 
 You should see `assets bot starting, saving to ...`.
 
-### 4. Authorize yourself
+### 4. Authorize yourself (if you picked "private" or "allowlist")
 
-The bot installs at the workspace level, which means anyone in your Slack workspace can DM it. To prevent that, every message is checked against `ALLOWED_SLACK_USERS` in `.env` — empty by default, so the bot refuses all messages until you add your ID.
+When a Slack app is installed in a workspace, **any workspace member can DM it** by default. Since this bot saves files to **your** computer, you almost certainly want to gate that. The setup wizard already asked which mode you want; here's how each one behaves:
 
-1. DM the bot anything (e.g. "hi").
-2. It'll reply with `Your Slack user ID is U01234ABCD`.
-3. Paste that ID into `.env` as `ALLOWED_SLACK_USERS=U01234ABCD` (comma-separated to authorize multiple people).
-4. Restart the bot.
+| Mode | `.env` config | Behavior |
+|---|---|---|
+| **Private (just me)** | `ALLOWED_SLACK_USERS=U01234ABCD` | Only listed user IDs can use the bot. Everyone else gets a polite refusal. |
+| **Specific teammates** | `ALLOWED_SLACK_USERS=U01234,U05678,U09012` | Same as above with multiple IDs. |
+| **Workspace-wide** | `ALLOW_WORKSPACE=true` | Skips the check entirely. Use only if you're alone in the workspace. |
+
+If you don't know your Slack user ID:
+1. Start the bot with `ALLOWED_SLACK_USERS=` empty.
+2. DM the bot anything (e.g. "hi").
+3. It'll reply with `Your Slack user ID is U01234ABCD`.
+4. Paste that ID into `.env`, restart the bot.
+
+To find a teammate's ID: open their profile in Slack → ⋮ menu → **Copy member ID**.
 
 Now DM the bot a file or a link — it'll reply in-thread with the saved path.
 
