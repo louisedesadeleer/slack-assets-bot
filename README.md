@@ -33,8 +33,8 @@ you  → name: kanye_laugh
 Uploaded images get two passes:
 
 **Where to put it** (folder):
-1. Filename pre-check — `CleanShot*`, `Screenshot*`, etc. → `screenshots/`
-2. `claude` CLI vision call for everything else → `screenshots/` or `photos/`
+1. Filename pre-check — `CleanShot*`, `Screenshot*`, etc. → `screenshots/`; anything with `logo`, `wordmark`, `favicon`, `app-icon` in the name → `logos/`
+2. `claude` CLI vision call for everything else → picks from your enabled image folders (`screenshots/`, `photos/`, `memes/`, `thumbnails/`, `logos/`)
 3. Fallback: `photos/`
 
 **What to call it** (filename), when `AUTO_NAME_IMAGES=true`:
@@ -78,7 +78,7 @@ python setup.py
 
 The setup wizard asks you:
 - **What to name your assets folder** (default: `~/assets`)
-- **Which categories you want** — checkbox list. Default 4: screenshots, photos, videos, sounds. Opt-in extras: memes, thumbnails. Pick whichever fits how you organize stuff.
+- **Which categories you want** — checkbox list. Default 4: screenshots, photos, videos, sounds. Opt-in extras: memes, thumbnails, logos. Pick whichever fits how you organize stuff.
 - **Your Slack tokens** (from step 1)
 - **Authorized Slack user IDs** — leave empty for now if you don't know yours
 
@@ -182,7 +182,17 @@ The folder you picked during setup gets one subfolder per category you enabled, 
         └── photos/
 ```
 
-If you opt into `memes` or `thumbnails` during setup, those folders are added too. Project folders mirror whichever categories you enabled.
+If you opt into `memes`, `thumbnails`, or `logos` during setup, those folders are added too. Project folders mirror whichever categories you enabled.
+
+## Pro tip: put `~/assets` in your Finder sidebar
+
+The bot is most useful when your asset library is one click away from any save dialog or browser download. Add the folder to Finder's sidebar Favorites once and you'll never hunt for it again:
+
+1. Open Finder (or wait for `setup.py` to do it for you on its last step).
+2. Navigate to your assets folder (`~/assets` by default).
+3. Drag the folder into the **Favorites** section of the left sidebar.
+
+Now it shows up in every Save / Save As dialog, in the Finder sidebar, and in app file pickers — drop logos, photos, anything you grab off the web straight in without leaving the app you're in.
 
 ## License
 

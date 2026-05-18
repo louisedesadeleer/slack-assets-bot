@@ -43,6 +43,7 @@ CATEGORY_TYPES = {
     "photos": "image",
     "memes": "image",
     "thumbnails": "image",
+    "logos": "image",
     "videos": "video",
     "sounds": "audio",
 }
@@ -54,13 +55,13 @@ for d in CATEGORY_DIRS.values():
 
 def image_categories() -> list[str]:
     """Enabled image subcategories, in classifier preference order."""
-    order = ["screenshot", "photo", "meme", "thumbnail"]
+    order = ["screenshot", "logo", "photo", "meme", "thumbnail"]
     return [c for c in order if f"{c}s" in ENABLED_CATEGORIES]
 
 
 def default_image_dir() -> Path | None:
     """Default folder for images that don't match a specific subcategory."""
-    for c in ("photos", "screenshots", "memes", "thumbnails"):
+    for c in ("photos", "screenshots", "memes", "thumbnails", "logos"):
         if c in ENABLED_CATEGORIES:
             return CATEGORY_DIRS[c]
     return None
@@ -239,18 +240,26 @@ SCREENSHOT_NAME_RE = re.compile(
     re.IGNORECASE,
 )
 
+LOGO_NAME_RE = re.compile(
+    r"(^|[\s_\-.])(logo|wordmark|brandmark|favicon|app[\s_-]?icon)([\s_\-.]|$)",
+    re.IGNORECASE,
+)
+
 
 CATEGORY_DESCRIPTIONS = {
     "screenshot": "a capture of a computer or phone interface",
     "photo": "a real-world picture or a designed image",
     "meme": "a reaction image, GIF macro, or joke image with text overlay",
     "thumbnail": "a designed cover image for video content (16:9 with overlaid text, faces, bold styling)",
+    "logo": "a brand mark, wordmark, or app icon — typically simple geometry, limited colors, often on a transparent or flat background, representing a company, product, or service",
 }
 
 
 def classify_by_filename(path: Path) -> str | None:
     if "screenshots" in ENABLED_CATEGORIES and SCREENSHOT_NAME_RE.match(path.name):
         return "screenshot"
+    if "logos" in ENABLED_CATEGORIES and LOGO_NAME_RE.search(path.name):
+        return "logo"
     return None
 
 

@@ -30,6 +30,7 @@ CATEGORY_CHOICES = [
     ("sounds", ".mp3 from YouTube + any audio file uploads", True),
     ("memes", "Reaction images, GIF macros (needs Claude classifier)", False),
     ("thumbnails", "YouTube/social cover art (needs Claude classifier)", False),
+    ("logos", "Brand marks, wordmarks, app icons (needs Claude classifier)", False),
 ]
 
 REPO_DIR = Path(__file__).resolve().parent
@@ -228,6 +229,18 @@ def main() -> None:
         print("\n  next: run `python bot.py`")
     if not allowed_users:
         print("  then DM the bot — it'll reply with your user ID to add to ALLOWED_SLACK_USERS")
+
+    if sys.platform == "darwin":
+        print(
+            f"\n  💡 pro tip: drag {assets_dir} into Finder's sidebar Favorites\n"
+            f"     so you can drop files into it from any save dialog or window in one click."
+        )
+        open_finder = questionary.confirm(
+            "Open the folder in Finder now so you can drag it into Favorites?",
+            default=True,
+        ).ask()
+        if open_finder:
+            subprocess.run(["open", str(assets_dir)])
     print()
 
 
