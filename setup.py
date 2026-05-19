@@ -49,7 +49,7 @@ PLIST_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
   </array>
   <key>WorkingDirectory</key><string>{repo}</string>
   <key>EnvironmentVariables</key>
-  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
+  <dict><key>PATH</key><string>{home}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>StandardOutPath</key><string>{log}</string>
@@ -68,6 +68,7 @@ def install_launchagent() -> bool:
         bot_py=REPO_DIR / "bot.py",
         repo=REPO_DIR,
         log=REPO_DIR / "bot.log",
+        home=Path.home(),
     )
     PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
     PLIST_PATH.write_text(plist_xml)

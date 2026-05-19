@@ -329,6 +329,12 @@ def auto_name_image(path: Path) -> str | None:
     available or the call fails. The slug is sanitized to [a-z0-9_].
     """
     if not shutil.which("claude"):
+        log.warning(
+            "auto-name skipped for %s: `claude` CLI not on PATH. "
+            "Current PATH=%s",
+            path.name,
+            os.environ.get("PATH", ""),
+        )
         return None
     prompt = (
         f"Look at the image at {path} and describe its main subject in 2 to "
