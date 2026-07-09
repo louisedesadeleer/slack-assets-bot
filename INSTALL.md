@@ -57,3 +57,15 @@ Follow the [README setup](./README.md#setup): create the Slack app from `manifes
 | live in Claude Code, assets are mostly local | **Claude Code skill** (3) |
 | don't run any agent / want phone → laptop drops without an agent in the loop | **Standalone bot** (4) |
 | want both: agent files things AND a phone inbox | 1/2 **and** 4 — they share the same folder taxonomy, so they compose |
+
+## Who keeps it running? (the always-on truth)
+
+An asset inbox is only useful if it catches the meme you send at 11pm from your phone. Be honest about what stays alive:
+
+| Mode | Always-on? | Kept alive by |
+|---|---|---|
+| **Standalone bot** (4) | ✅ yes | the LaunchAgent `setup.py` installs — starts at login, auto-restarts on crash/sleep/death. This is the most reliable "it just always works" path, and it needs no agent subscription. Linux: run `bot.py` under systemd (`Restart=always`). |
+| **Hermes / OpenClaw skill** (1/2) | ✅ *if* your gateway runs 24/7 | the agent's own gateway daemon. Both are built for this (Hermes even runs on a $5 VPS) — but the skill is exactly as alive as your agent is. Laptop-only gateway that sleeps = inbox that sleeps. |
+| **Claude Code skill** (3) | ❌ no | nothing — Claude Code sessions are on-demand. This mode is for filing things you already have locally and letting other skills *read* the library. It is not an inbox. |
+
+**Recommendation:** if "always catches it" is the requirement, install the **standalone bot** (4) — the LaunchAgent makes it survive reboots, crashes, and sleep without you thinking about it. Add skill mode on top if you run an agent: the bot catches, the agent *uses* the library.
