@@ -8,10 +8,10 @@ In an age of agentic video editing and AI-generated content, the thing that make
 
 ## ⚡ Two ways to run it — pick in [INSTALL.md](./INSTALL.md)
 
-- **Skill mode** — already running an agent that lives in your chats (**Hermes**, **OpenClaw**, or Claude Code)? Install [`SKILL.md`](./SKILL.md) and your agent *becomes* the assets bot — same filing rules, zero extra infrastructure, no Slack app, no tokens. → [INSTALL.md](./INSTALL.md)
-- **Standalone Slack bot** — no agent? The original always-on Python bot, below. DM it from your phone and files land on your machine.
+- **The Slack bot, kept alive by a LaunchAgent** *(default)* — the always-on Python bot, below. DM it from your phone, files land on your machine. The setup wizard installs a [LaunchAgent](./INSTALL.md#how-the-launchagent-works) so it starts at login and restarts itself if it ever dies — the OS is the babysitter.
+- **Skill mode** — already running an agent that lives in your chats (**Hermes**, **OpenClaw**, or Claude Code)? Install [`SKILL.md`](./SKILL.md) and your agent *becomes* the assets bot — same filing rules, no Slack app, no tokens. Always-on only if your agent's gateway is. → [INSTALL.md](./INSTALL.md)
 
-Both share the same folder taxonomy, so they compose — you can run the bot for phone drops *and* give your agent the skill.
+Both share the same folder taxonomy, so they compose — run the bot for phone drops *and* give your agent the skill: the bot catches, the agent uses.
 
 ---
 
