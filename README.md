@@ -6,6 +6,13 @@ In an age of agentic video editing and AI-generated content, the thing that make
 
 **This bot is a low-friction way to keep that library at hand.** Drop anything into a Slack DM — files, YouTube links, image URLs — and it lands organized on your machine, named so Claude (or you) can find it later. Build the asset bank, then let the agents do the editing.
 
+## ⚡ Two ways to run it — pick in [INSTALL.md](./INSTALL.md)
+
+- **Skill mode** — already running an agent that lives in your chats (**Hermes**, **OpenClaw**, or Claude Code)? Install [`SKILL.md`](./SKILL.md) and your agent *becomes* the assets bot — same filing rules, zero extra infrastructure, no Slack app, no tokens. → [INSTALL.md](./INSTALL.md)
+- **Standalone Slack bot** — no agent? The original always-on Python bot, below. DM it from your phone and files land on your machine.
+
+Both share the same folder taxonomy, so they compose — you can run the bot for phone drops *and* give your agent the skill.
+
 ---
 
 A personal Slack bot that turns your DMs into an asset library. Drop a file, paste a YouTube link, send any image URL — it sorts everything into category folders on your machine. You pick the categories during setup.
